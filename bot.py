@@ -141,18 +141,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def choose(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+async def  choose(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        await query.answer()
 
     category = query.data
     context.user_data["last_category"] = category
 
     if ADMIN_ID:
+        user = update.effective_user
         await context.bot.send_message(
             chat_id=ADMIN_ID,
-            text=...
+            text=f"👀 Муж нажал кнопку\n\n👤 {user...
         )
+
+    text = (
+        "Привет, любимый ❤️\n\n"
+    )
 
     if category == "breakfast":
         text = (
