@@ -18,6 +18,7 @@ logging.basicConfig(
 )
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 PORT = int(os.getenv("PORT", "10000"))
 
 
@@ -146,6 +147,12 @@ async def choose(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     category = query.data
     context.user_data["last_category"] = category
+
+    if ADMIN_ID:
+    await context.bot.send_message(
+        chat_id=ADMIN_ID,
+        text=f"👀 Муж в боте\n\nДействие: {category}"
+    )
 
     if category == "breakfast":
         text = (
