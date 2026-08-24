@@ -1,8 +1,9 @@
 import os
 import random
 import logging
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
@@ -15,6 +16,24 @@ logging.basicConfig(
 )
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+
+PORT = int(os.getenv("PORT", "10000"))
+
+
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"OK")
+
+    def log_message(self, format, *args):
+        return
+
+
+def start_web_server():
+    server = ThreadingHTTPServer(("0.0.0.0", PORT), HealthHandler)
+    server.serve_forever()
+
 
 BREAKFASTS = [
     "🍳 Яичница с сыром + тосты + авокадо 🥑",
@@ -188,13 +207,22 @@ async def choose(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def run():
     if not TOKEN:
         raise RuntimeError(
-            "Не задан TELEGRAM_BOT_TOKEN. Добавь его в Environment Variables в Render."
+            "Не задан TELEGRAM_BOT_TOKEN..."
         )
 
+    web_thread = threading.Thread(
+        target=start_web_server,
+        daemon=True
+    )
+    web_thread.start()
+
     app = Application.builder().token(TOKEN).build()
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(choose))
+    logging.info("Telegram bot is starting...")
     app.run_polling()
+
 
 if __name__ == "__main__":
     run()
