@@ -1,6 +1,9 @@
 import os
 import random
 import logging
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -15,6 +18,25 @@ logging.basicConfig(
 )
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+PORT = int(os.getenv("PORT", "10000"))
+
+
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(b"OK")
+
+    def log_message(self, format, *args):
+        return
+
+
+def start_web_server():
+    server = ThreadingHTTPServer(("0.0.0.0", PORT), HealthHandler)
+    logging.info(f"Web server started on port {PORT}")
+    server.serve_forever()
+
 
 BREAKFASTS = [
     "🍳 Яичница с сыром + тосты + авокадо 🥑",
@@ -77,6 +99,7 @@ HUNGER = {
     ],
 }
 
+
 def main_menu():
     return InlineKeyboardMarkup([
         [
@@ -93,21 +116,29 @@ def main_menu():
         ],
     ])
 
+
 def back_button():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🔄 Другой вариант", callback_data="repeat")],
         [InlineKeyboardButton("🏠 Главное меню", callback_data="home")],
     ])
 
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["last_category"] = None
+
     text = (
         "Привет, любимый ❤️\n\n"
         "Здесь собраны маленькие подсказки от твоей жены, "
         "чтобы тебе было проще решить, что сегодня поесть 😘\n\n"
         "Что выбираем?"
     )
-    await update.message.reply_text(text, reply_markup=main_menu())
+
+    await update.message.reply_text(
+        text,
+        reply_markup=main_menu()
+    )
+
 
 async def choose(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -117,71 +148,130 @@ async def choose(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["last_category"] = category
 
     if category == "breakfast":
-        text = f"☀️ Сегодня на завтрак:\n\n{random.choice(BREAKFASTS)}\n\n❤️ Одобрено женой."
+        text = (
+            f"☀️ Сегодня на завтрак:\n\n"
+            f"{random.choice(BREAKFASTS)}\n\n"
+            f"❤️ Одобрено женой."
+        )
+
     elif category == "lunch":
-        text = f"🍲 Сегодня на обед:\n\n{random.choice(LUNCHES)}\n\n😋 Приятного аппетита!"
+        text = (
+            f"🍲 Сегодня на обед:\n\n"
+            f"{random.choice(LUNCHES)}\n\n"
+            f"😋 Приятного аппетита!"
+        )
+
     elif category == "dinner":
-        text = f"🌙 Сегодня на ужин:\n\n{random.choice(DINNERS)}\n\n❤️ Выбирай с любовью."
+        text = (
+            f"🌙 Сегодня на ужин:\n\n"
+            f"{random.choice(DINNERS)}\n\n"
+            f"❤️ Выбирай с любовью."
+        )
+
     elif category == "treat":
-        text = f"🍫 Жена разрешила вкусненькое:\n\n{random.choice(TREATS)}\n\n😏 Но только немного!"
+        text = (
+            f"🍫 Жена разрешила вкусненькое:\n\n"
+            f"{random.choice(TREATS)}\n\n"
+            f"😏 Но только немного!"
+        )
+
     elif category == "advice":
         text = random.choice(WIFE_ADVICE)
+
     elif category == "hungry":
         text = (
             "🍽 Насколько ты голодный?\n\n"
             "Выбирай честно — холодильник всё равно всё знает 😄"
         )
+
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔹 Немного", callback_data="h_a_little")],
             [InlineKeyboardButton("🔸 Нормально", callback_data="h_normal")],
             [InlineKeyboardButton("🔴 Я съем холодильник", callback_data="h_very")],
             [InlineKeyboardButton("🏠 Главное меню", callback_data="home")],
         ])
-        await query.edit_message_text(text, reply_markup=keyboard)
+
+        await query.edit_message_text(
+            text,
+            reply_markup=keyboard
+        )
         return
+
     elif category == "home":
         await query.edit_message_text(
             "❤️ Ну что, любимый, выбирай:",
             reply_markup=main_menu(),
         )
         return
+
     elif category == "repeat":
         last = context.user_data.get("last_category")
+
         if last in ("breakfast", "lunch", "dinner", "treat"):
             category = last
             context.user_data["last_category"] = category
+
+            menus = {
+                "breakfast": BREAKFASTS,
+                "lunch": LUNCHES,
+                "dinner": DINNERS,
+                "treat": TREATS,
+            }
+
             await query.edit_message_text(
-                f"🔄 Тогда ещё вариант:\n\n{random.choice({'breakfast': BREAKFASTS, 'lunch': LUNCHES, 'dinner': DINNERS, 'treat': TREATS}[category])}",
+                f"🔄 Тогда ещё вариант:\n\n"
+                f"{random.choice(menus[category])}",
                 reply_markup=back_button(),
             )
             return
-        await query.edit_message_text("❤️ Выбирай:", reply_markup=main_menu())
+
+        await query.edit_message_text(
+            "❤️ Выбирай:",
+            reply_markup=main_menu()
+        )
         return
+
     else:
         mapping = {
             "h_a_little": HUNGER["a_little"],
             "h_normal": HUNGER["normal"],
             "h_very": HUNGER["very"],
         }
+
         if category in mapping:
             text = random.choice(mapping[category])
         else:
             text = "❤️ Выбирай:"
-            await query.edit_message_text(text, reply_markup=main_menu())
-            return
 
-    await query.edit_message_text(text, reply_markup=back_button())
+    await query.edit_message_text(
+        text,
+        reply_markup=back_button()
+    )
+
 
 def run():
     if not TOKEN:
         raise RuntimeError(
-            "Не задан TELEGRAM_BOT_TOKEN. Добавь его в Environment Variables в Render."
+            "Не задан TELEGRAM_BOT_TOKEN. "
+            "Добавь его в Environment Variables в Render."
         )
 
+    # HTTP-сервер для Render
+    web_thread = threading.Thread(
+        target=start_web_server,
+        daemon=True
+    )
+    web_thread.start()
+
+    # Telegram-бот
     app = Application.builder().token(TOKEN).build()
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(choose))
+
+    logging.info("Telegram bot is starting...")
     app.run_polling()
+
 
 if __name__ == "__main__":
     run()
