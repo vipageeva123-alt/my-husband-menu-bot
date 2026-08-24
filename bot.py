@@ -149,10 +149,10 @@ async def choose(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["last_category"] = category
 
     if ADMIN_ID:
-    await context.bot.send_message(
-        chat_id=ADMIN_ID,
-        text=f"👀 Муж в боте\n\nДействие: {category}"
-    )
+        await context.bot.send_message(
+            chat_id=ADMIN_ID,
+            text=...
+        )
 
     if category == "breakfast":
         text = (
